@@ -22,16 +22,23 @@ CREATE OR REPLACE PACKAGE BODY pkg_bonus AS
 
     PROCEDURE generate_year_bonus(p_year IN NUMBER) IS
     BEGIN
-        FOR r IN (SELECT employee_id FROM employees) LOOP
-            MERGE INTO employee_bonus b
-            USING (SELECT r.employee_id AS emp_id FROM dual) s
-               ON (b.employee_id = s.emp_id AND b.bonus_year = p_year)
-             WHEN MATCHED THEN
-                  UPDATE SET bonus_amount = calc_bonus(r.employee_id)
-             WHEN NOT MATCHED THEN
-                  INSERT (employee_id, bonus_year, bonus_amount)
-                  VALUES (r.employee_id, p_year, calc_bonus(r.employee_id));
-        END LOOP;
+        MERGE INTO employee_bonus b
+        USING (
+            SELECT e.employee_id,
+                   CASE
+                       WHEN d.department_name IS NULL THEN 0
+                       WHEN d.department_name = c_sales_dept THEN e.salary * 0.10
+                       ELSE e.salary * 0.05
+                   END AS bonus_amount
+              FROM employees e
+              LEFT JOIN departments d ON d.department_id = e.department_id
+        ) s
+           ON (b.employee_id = s.employee_id AND b.bonus_year = p_year)
+         WHEN MATCHED THEN
+              UPDATE SET b.bonus_amount = s.bonus_amount
+         WHEN NOT MATCHED THEN
+              INSERT (employee_id, bonus_year, bonus_amount)
+              VALUES (s.employee_id, p_year, s.bonus_amount);
         COMMIT;
     END generate_year_bonus;
 

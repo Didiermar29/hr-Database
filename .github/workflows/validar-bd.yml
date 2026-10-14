@@ -1,0 +1,38 @@
+name: Validar base de datos
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Validar nombres de migraciones
+        run: |
+          status=0
+          for f in db/migrations/*.sql; do
+            [ -e "$f" ] || continue
+            name=$(basename "$f")
+            if ! echo "$name" | grep -Eq '^V[0-9]{3}__[a-z0-9_]+\.sql$'; then
+              echo "Nombre invalido: $name (debe ser V001__descripcion.sql)"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Validar que cada package tenga spec y body
+        run: |
+          status=0
+          for spec in db/packages/*.pks; do
+            [ -e "$spec" ] || continue
+            body="${spec%.pks}.pkb"
+            if [ ! -f "$body" ]; then
+              echo "Falta el body de $spec"
+              status=1
+            fi
+          done
+          exit $status
